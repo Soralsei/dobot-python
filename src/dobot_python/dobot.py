@@ -1,6 +1,8 @@
+import logging
 from time import sleep
 
-from .interface import Interface
+from .interface import Interface, PTPMode
+
 
 ALARM_LABELS = {
     0x00: "Reset occurred",
@@ -39,7 +41,8 @@ ALARM_LABELS = {
 class Dobot:
     def __init__(self, port):
         self.interface = Interface(port)
-
+        self.logger = logging.Logger(__name__)
+        
         self.interface.stop_queue(True)
         self.interface.clear_queue()
         self.interface.start_queue()
@@ -60,10 +63,17 @@ class Dobot:
 
         self.interface.set_continous_trajectory_params(50, 50, 50)
 
-    def close(self):
+        alarms = self.interface.get_alarms()
+        print("Current alarms:", alarms)
+        if alarms:
+            self.logger.warning(f"Clearing alarms: {', '.join(map(str, alarms))}.")
+            self.interface.clear_alarms()
+
+    def close(self, force_close: bool = False):
         """Wait for all commands to finish and close the connection."""
-        self.wait()
-        self.interface.close()
+        if not force_close:
+            self.wait()
+        self.interface.close(force=force_close)
 
     def connected(self):
         return self.interface.connected()
@@ -99,29 +109,42 @@ class Dobot:
         if wait:
             self.wait()
 
-    # Move to the absolute coordinate, one axis at a time
-    def move_to(self, x, y, z, r, wait=True):
-        self.interface.set_point_to_point_command(3, x, y, z, r)
+    def move_to(self, x, y, z, r, mode=PTPMode.MOVJ_XYZ, wait=True):
+        """Generic move method. Allows specifying the PTP mode for movement.
+        By default, it uses MOVJ_XYZ (move to absolute coordinate, one axis at a time).
+        """
+        self.interface.set_point_to_point_command(mode, x, y, z, r)
         if wait:
             self.wait()
 
-    # Slide to the absolute coordinate, shortest possible path
+    def move_to_joint(self, j1, j2, j3, j4, wait=True):
+        self.move_to(j1, j2, j3, j4, PTPMode.MOVJ_ANGLE, wait)
+
+    def slide_to_joint(self, j1, j2, j3, j4, wait=True):
+        self.move_to(j1, j2, j3, j4, PTPMode.MOVL_ANGLE, wait)
+
+    def jump_to_joint(self, j1, j2, j3, j4, wait=True):
+        self.move_to(j1, j2, j3, j4, PTPMode.JUMP_ANGLE, wait)
+
     def slide_to(self, x, y, z, r, wait=True):
-        self.interface.set_point_to_point_command(4, x, y, z, r)
-        if wait:
-            self.wait()
+        """Move to the absolute XYZ coordinate using a linear motion (shortest possible path in Cartesian coordinates)."""
+        self.move_to(x, y, z, r, PTPMode.MOVL_XYZ, wait)
 
-    # Move to the absolute coordinate, one axis at a time
     def move_to_relative(self, x, y, z, r, wait=True):
-        self.interface.set_point_to_point_command(7, x, y, z, r)
-        if wait:
-            self.wait()
+        """Move to the relative XYZ coordinate one axis at a time."""
+        self.move_to(x, y, z, r, PTPMode.MOVJ_INC, wait)
 
-    # Slide to the relative coordinate, one axis at a time
     def slide_to_relative(self, x, y, z, r, wait=True):
-        self.interface.set_point_to_point_command(6, x, y, z, r)
-        if wait:
-            self.wait()
+        """Move to the relative XYZ coordinate one using a linear motion (shortest possible path in Cartesian coordinates)."""
+        self.move_to(x, y, z, r, PTPMode.MOVL_INC, wait)
+
+    def jump_to(self, x, y, z, r, wait=True):
+        """Move to the absolute XYZ coordinate using a jump motion."""
+        self.move_to(x, y, z, r, PTPMode.JUMP_XYZ, wait)
+
+    def jump_to_relative(self, x, y, z, r, wait=True):
+        """Move to the relative XYZ coordinate using a jump motion."""
+        self.move_to(x, y, z, r, PTPMode.JUMP_MOVL_XYZ, wait)
 
     # Wait until the instruction finishes
     def wait(self, queue_index=None):
