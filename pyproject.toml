@@ -17,3 +17,6 @@ HomePage = "https://github.com/Soralsei/dobot-python"
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
