@@ -60,6 +60,9 @@ class Dobot:
 
         self.interface.set_continous_trajectory_params(50, 50, 50)
 
+    def close(self):
+        self.interface.close()
+
     def connected(self):
         return self.interface.connected()
 

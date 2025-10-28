@@ -33,6 +33,12 @@ class Interface:
         
         return response.params
 
+    def close(self):
+        """Close the serial connection properly."""
+        self.stop_queue()
+        self.clear_queue()
+        self.serial.close()
+
     def connected(self):
         return self.serial.is_open
 
