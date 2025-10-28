@@ -1,6 +1,39 @@
 from time import sleep
 
-from lib.interface import Interface
+from .interface import Interface
+
+ALARM_LABELS = {
+    0x00: "Reset occurred",
+    0x01: "Undefined instruction",
+    0x02: "File system error",
+    0x03: "Communications error between MCU and FPGA",
+    0x04: "Angle sensor error",
+    0x10: "Plan: pose is abnormal",
+    0x11: "Plan: pose is out of workspace",
+    0x12: "Plan: joint limit",
+    0x13: "Plan: repetitive points",
+    0x14: "Plan: arc input parameter",
+    0x15: "Plan: jump parameter",
+    0x20: "Motion: kinematic singularity",
+    0x21: "Motion: out of workspace",
+    0x22: "Motion: inverse limit",
+    0x30: "Axis 1 over speed limit",
+    0x31: "Axis 2 over speed limit",
+    0x32: "Axis 3 over speed limit",
+    0x33: "Axis 4 over speed limit",
+    0x40: "Axis 1 positive limit",
+    0x41: "Axis 1 negative limit",
+    0x42: "Axis 2 positive limit",
+    0x43: "Axis 2 negative limit",
+    0x44: "Axis 3 positive limit",
+    0x45: "Axis 3 negative limit",
+    0x46: "Axis 4 positive limit",
+    0x47: "Axis 4 negative limit",
+    0x50: "Axis 1 lost steps",
+    0x51: "Axis 2 lost steps",
+    0x52: "Axis 3 lost steps",
+    0x53: "Axis 4 lost steps",
+}
 
 
 class Dobot:
@@ -12,7 +45,9 @@ class Dobot:
         self.interface.start_queue()
 
         self.interface.set_point_to_point_jump_params(10, 10)
-        self.interface.set_point_to_point_joint_params([50, 50, 50, 50], [50, 50, 50, 50])
+        self.interface.set_point_to_point_joint_params(
+            [50, 50, 50, 50], [50, 50, 50, 50]
+        )
         self.interface.set_point_to_point_coordinate_params(50, 50, 50, 50)
 
         # velocity and acceleration ratio
@@ -33,59 +68,26 @@ class Dobot:
 
     def printq(self):
         pose = self.get_pose()
-        print('q:   ', ' '.join([f'{q:8.1f}' for q in pose[4:]]))
+        if pose is None:
+            print("Unable to get pose")
+            return
+        print("q:   ", " ".join([f"{q:8.1f}" for q in pose[4:]]))
 
     def printx(self):
         pose = self.get_pose()
-        print('x:   ', ' '.join([f'{q:8.1f}' for q in pose[:4]]))
-
-
-    alarm_dict = {
-        0x00: 'reset occurred',
-        0x01: 'undefined instruction',
-        0x02: 'file system error',
-        0x03: 'communications error between MCU and FPGA',
-        0x04: 'angle sensor error',
-
-        0x10: 'plan: pose is abnormal',
-        0x11: 'plan: pose is out of workspace',
-        0x12: 'plan: joint limit',
-        0x13: 'plan: repetitive points',
-        0x14: 'plan: arc input parameter',
-        0x15: 'plan: jump parameter',
-
-        0x20: 'motion: kinematic singularity',
-        0x21: 'motion: out of workspace',
-        0x22: 'motion: inverse limit',
-
-        0x30: 'axis 1 overspeed',
-        0x31: 'axis 2 overspeed',
-        0x32: 'axis 3 overspeed',
-        0x33: 'axis 4 overspeed',
-
-        0x40: 'axis 1 positive limit',
-        0x41: 'axis 1 negative limit',
-        0x42: 'axis 2 positive limit',
-        0x43: 'axis 2 negative limit',
-        0x44: 'axis 3 positive limit',
-        0x45: 'axis 3 negative limit',
-        0x46: 'axis 4 positive limit',
-        0x47: 'axis 4 negative limit',
-
-        0x50: 'axis 1 lost steps',
-        0x51: 'axis 2 lost steps',
-        0x52: 'axis 3 lost steps',
-        0x53: 'axis 4 lost steps',
-    }
+        if pose is None:
+            print("Unable to get x")
+            return
+        print("x:   ", " ".join([f"{q:8.1f}" for q in pose[:4]]))
 
     def print_alarms(self, a):
         alarms = []
         for i, x in enumerate(a):
             for j in range(8):
-                if x & (1<<j) > 0:
-                    alarms.append(8*i + j)
+                if x & (1 << j) > 0:
+                    alarms.append(8 * i + j)
         for alarm in alarms:
-            print('ALARM:', self.alarm_dict[alarm])
+            print("ALARM:", ALARM_LABELS[alarm])
 
     def home(self, wait=True):
         self.interface.set_homing_command(0)
@@ -126,7 +128,8 @@ class Dobot:
         if queue_index is None:
             queue_index = self.interface.get_current_queue_index()
         while True:
-            if self.interface.get_current_queue_index() > queue_index:
+            index = self.interface.get_current_queue_index()
+            if index is not None and index > queue_index:
                 break
 
             sleep(0.5)
@@ -136,7 +139,9 @@ class Dobot:
         self.interface.stop_queue()
         queue_index = None
         for point in path:
-            queue_index = self.interface.set_continous_trajectory_command(1, point[0], point[1], point[2], 50)
+            queue_index = self.interface.set_continous_trajectory_command(
+                1, point[0], point[1], point[2], 50
+            )
         self.interface.start_queue()
         if wait:
             self.wait(queue_index)
@@ -146,7 +151,9 @@ class Dobot:
         self.interface.stop_queue()
         queue_index = None
         for point in path:
-            queue_index = self.interface.set_continous_trajectory_command(0,  point[0], point[1], point[2], 50)
+            queue_index = self.interface.set_continous_trajectory_command(
+                0, point[0], point[1], point[2], 50
+            )
         self.interface.start_queue()
         if wait:
             self.wait(queue_index)

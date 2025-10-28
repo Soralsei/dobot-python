@@ -1,22 +1,39 @@
-from lib.parsers import parsers
+from enum import IntEnum
+
+from typing import Any, Optional
+from .parsers import parsers
+
+
+class IODirection(IntEnum):
+    IN = 0
+    OUT = 1
 
 
 class Message:
-    def __init__(self, header, length, id, rw, is_queued, params, direction='in'):
+    def __init__(
+        self,
+        header,
+        length,
+        id,
+        rw,
+        is_queued,
+        params,
+        direction: IODirection = IODirection.IN,
+    ):
         self.header = header
         self.length = length
         self.id = id
         self.rw = rw
         self.is_queued = is_queued
-        self.raw_params = []
-        self.params = []
+        self.raw_params: Any = []
+        self.params: Any = []
 
-        if direction == 'in':
+        if direction == IODirection.IN:
             self.raw_params = params
-            self.params = self.parse_params('in')
-        elif direction == 'out':
+            self.params = self.parse_params(direction)  # type: ignore
+        elif direction == IODirection.OUT:
             self.params = params
-            self.raw_params = self.parse_params('out')
+            self.raw_params = self.parse_params(direction)  # type: ignore
 
     @staticmethod
     def calculate_checksum(payload):
@@ -54,18 +71,18 @@ class Message:
     @staticmethod
     def read(serial):
         header = serial.read(2)
-        if header != b'\xaa\xaa':
+        if header != b"\xaa\xaa":
             return None
-        length = int.from_bytes(serial.read(1), 'little')
+        length = int.from_bytes(serial.read(1), "little")
         payload = serial.read(length)
         checksum = serial.read(1)
 
         return Message.parse(header + bytes([length]) + payload + checksum)
 
-    def parse_params(self, direction):
+    def parse_params(self, direction) -> Optional[tuple | list | str]:
         message_parsers = parsers[self.id]
 
-        if direction == 'in':
+        if direction == IODirection.IN:
             if message_parsers is None:
                 return None
 
@@ -81,12 +98,12 @@ class Message:
                 return []
 
             return parser(self.raw_params)
-        elif direction == 'out':
+        elif direction == IODirection.OUT:
             if message_parsers is None:
                 return []
 
             parser = None
-            if direction == 'out' and self.rw == 1:
+            if self.rw == 1:
                 parser = message_parsers[3]
 
             if parser is None:
@@ -95,10 +112,22 @@ class Message:
             return parser(self.params)
 
     def package(self):
-        self.length = 2 + len(self.raw_params)
-        control = int('000000' + str(int(self.is_queued)) + str(int(self.rw)), 2)
-        self.checksum = Message.calculate_checksum([self.id] + [control] + self.raw_params)
+        if self.raw_params is None:
+            self.raw_params = []
 
-        result = bytes(self.header + [self.length] + [self.id] + [control] + self.raw_params + [self.checksum])
+        self.length = 2 + len(self.raw_params)
+        control = int("000000" + str(int(self.is_queued)) + str(int(self.rw)), 2)
+        self.checksum = Message.calculate_checksum(
+            [self.id] + [control] + list(self.raw_params)
+        )
+
+        result = bytes(
+            self.header
+            + [self.length]
+            + [self.id]
+            + [control]
+            + self.raw_params
+            + [self.checksum]
+        )
 
         return result

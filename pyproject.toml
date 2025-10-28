@@ -1,0 +1,19 @@
+[project]
+name = "dobot-python"
+dynamic = ["version"]
+description = "A cross-platform low-level interface and high-level API for the Dobot Magician robotic arm written in Python 3"
+readme = "README.md"
+authors = [{ name = "Kohio DEFLESSELLE", email = "kohiodef@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = ["pyserial>=3.5"]
+
+license = "MIT"
+license-files = ["LICENSE.md"]
+keywords = ["dobot", "robotic arm", "automation", "python", "api", "interface"]
+
+[project.urls]
+HomePage = "https://github.com/Soralsei/dobot-python"
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
