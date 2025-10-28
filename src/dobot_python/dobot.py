@@ -61,6 +61,8 @@ class Dobot:
         self.interface.set_continous_trajectory_params(50, 50, 50)
 
     def close(self):
+        """Wait for all commands to finish and close the connection."""
+        self.wait()
         self.interface.close()
 
     def connected(self):
